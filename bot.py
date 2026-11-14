@@ -255,13 +255,23 @@ async def send_preview(message, d: dict):
 async def set_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await guard(update):
         return ConversationHandler.END
-    target = (update.effective_message.text or "").strip()
-    if not target:
-        await update.effective_message.reply_text("Please send a chat ID or @username.")
+    target_text = (update.effective_message.text or "").strip()
+    if not target_text:
+        await update.effective_message.reply_text("Please send a chat ID (including negative IDs such as -1001234567890) or @username.")
+        return WAIT_TARGET
+    # Telegram supergroup/channel IDs are negative integers, commonly prefixed -100.
+    # Convert numeric strings to int so python-telegram-bot treats them as chat IDs,
+    # while keeping public @usernames as strings.
+    if target_text.lstrip("-").isdigit() and target_text not in {"-", ""}:
+        target = int(target_text)
+    elif target_text.startswith("@") and len(target_text) > 1:
+        target = target_text
+    else:
+        await update.effective_message.reply_text("Invalid destination. Send a numeric chat ID (for example -1001234567890) or @publicchannelusername.")
         return WAIT_TARGET
     draft(context)["target"] = target
     await update.effective_message.reply_text(
-        f"Destination: <code>{escape(target)}</code>\n"
+        f"Destination: <code>{escape(str(target))}</code>\n"
         "Send /confirm to publish or /back to return to the editor.",
         parse_mode=ParseMode.HTML,
     )
